@@ -7,20 +7,24 @@
 --
 -- La fin est estimee par le releve SUIVANT : on ne sait pas a quelle minute
 -- exacte la rupture a cesse, seulement qu elle avait cesse a ce moment-la.
+--
+-- Seules les stations reellement exploitees sont retenues (voir dim_station).
 
 with base as (
 
     select
-        station_id,
-        snapshot_ts,
-        est_en_rupture,
-        case when est_vide then 'vide'
-             when est_pleine then 'pleine' end as type_rupture,
-        lead(snapshot_ts) over (
-            partition by station_id order by snapshot_ts
+        s.station_id,
+        s.snapshot_ts,
+        s.est_en_rupture,
+        case when s.est_vide then 'vide'
+             when s.est_pleine then 'pleine' end as type_rupture,
+        lead(s.snapshot_ts) over (
+            partition by s.station_id order by s.snapshot_ts
         ) as releve_suivant
-    from {{ ref('stg_station_status') }}
-    where est_installee
+    from {{ ref('stg_station_status') }} s
+    join {{ ref('dim_station') }} d using (station_id)
+    where s.est_installee
+      and d.est_en_exploitation
 
 ),
 

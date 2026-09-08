@@ -1,7 +1,10 @@
 -- Etat de chaque station a chaque releve, nettoye et nomme en clair.
--- On y calcule les deux etats qui font perdre une course :
---   station vide  -> aucun velo a prendre
---   station pleine -> aucune place pour rendre
+--
+-- PIEGE TRAITE ICI : une station hors service affiche 0 velo ET 0 place.
+-- Elle coche donc a la fois "vide" et "pleine", en permanence, et ferait
+-- apparaitre un taux de rupture de 100 % sans qu aucun usager soit gene.
+-- Le discriminant : une vraie station pleine a des velos, une vraie station
+-- vide a des places. Seule une station morte a zero des deux.
 
 with source as (
 
@@ -29,6 +32,7 @@ nettoye as (
 select
     *,
     velos_disponibles + places_libres           as bornes_actives,
+    velos_disponibles + places_libres > 0       as est_en_service,
     velos_disponibles = 0                       as est_vide,
     places_libres = 0                           as est_pleine,
     velos_disponibles = 0 or places_libres = 0  as est_en_rupture
