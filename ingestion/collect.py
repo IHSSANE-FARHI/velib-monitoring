@@ -140,5 +140,26 @@ def main():
           f"{len(status_rows)} stations lues | {inserted} lignes en base pour ce releve")
 
 
+def boucle():
+    """Une exécution GitHub Actions couvre plusieurs heures de collecte.
+
+    GitHub ne garantit pas les crons courts : un `*/10` produit en pratique
+    un declenchement toutes les 2 a 4 heures. On demande donc peu de
+    declenchements, et chacun collecte longtemps.
+    """
+    duree = int(os.environ.get("DUREE_MINUTES", "0"))
+    intervalle = int(os.environ.get("INTERVALLE_SECONDES", "300"))
+    fin = time.time() + duree * 60
+
+    while True:
+        try:
+            main()
+        except Exception as erreur:
+            print(f"releve en echec, on reessaie au tour suivant : {erreur}")
+        if time.time() + intervalle >= fin:
+            break
+        time.sleep(intervalle)
+
+
 if __name__ == "__main__":
-    main()
+    boucle()
