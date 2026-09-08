@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: velib_raw
+    schema: public
+    description: >
+      Releves bruts du flux GBFS Velib Metropole, ecrits par le collecteur
+      GitHub Actions. Tables en ajout seul, jamais modifiees par dbt.
+
+    tables:
+      - name: raw_station_status
+        description: "Un releve d etat par station et par horodatage du flux."
+        loaded_at_field: snapshot_ts
+        freshness:
+          warn_after: {count: 3, period: hour}
+          error_after: {count: 12, period: hour}
+        columns:
+          - name: snapshot_ts
+            data_tests: [not_null]
+          - name: station_id
+            data_tests: [not_null]
+
+      - name: raw_station_information
+        description: "Caracteristiques des stations : nom, position, capacite."
+        columns:
+          - name: station_id
+            data_tests: [unique, not_null]
