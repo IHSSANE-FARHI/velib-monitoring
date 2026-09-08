@@ -6,6 +6,7 @@ ON CONFLICT DO NOTHING, relancer le job ne cree aucun doublon.
 """
 
 import os
+import time
 from datetime import datetime, timezone
 
 import psycopg2
@@ -141,7 +142,7 @@ def main():
 
 
 def boucle():
-    """Une exécution GitHub Actions couvre plusieurs heures de collecte.
+    """Une exÃ©cution GitHub Actions couvre plusieurs heures de collecte.
 
     GitHub ne garantit pas les crons courts : un `*/10` produit en pratique
     un declenchement toutes les 2 a 4 heures. On demande donc peu de
