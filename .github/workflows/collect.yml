@@ -1,3 +1,6 @@
+cd C:\Users\Probook\OneDrive\Documents\velib-monitoring
+$enc = New-Object System.Text.UTF8Encoding($false)
+$wf = @'
 name: collecte-velib
 
 on:
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   collecte:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 250
     steps:
       - uses: actions/checkout@v4
 
@@ -26,5 +29,11 @@ jobs:
       - run: python ingestion/collect.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DUREE_MINUTES: "130"
+          DUREE_MINUTES: "230"
           INTERVALLE_SECONDES: "300"
+'@
+[IO.File]::WriteAllText("$PWD\.github\workflows\collect.yml", $wf, $enc)
+
+git add .
+git commit -m "Boucle allongee a 230 min : la couverture suit les declenchements reels"
+git push
