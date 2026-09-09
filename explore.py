@@ -1,42 +1,76 @@
+"""Requetes d exploration sur les modeles analytics.
+
+Usage : python explore.py
+La periode analysee est reglee par DEBUT (collecte a cadence nominale).
+"""
 import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
-REQUETES = [
-    ("STATIONS LES PLUS SOUVENT EN RUPTURE", """
-        select d.nom_station,
-               count(*) as heures_observees,
-               round(avg(f.taux_rupture_pct), 1) as taux_moyen_pct
-        from analytics.fct_station_heure f
-        join analytics.dim_station d using (station_id)
-        group by d.nom_station
-        having count(*) >= 20
-        order by taux_moyen_pct desc
-        limit 15
-    """),
-    ("EPISODES PAR TYPE", """
-        select type_rupture,
-               count(*) as nb_episodes,
-               round(avg(duree_minutes), 1) as duree_moyenne_min,
-               max(duree_minutes) as duree_max_min
-        from analytics.fct_episode_rupture
-        group by type_rupture
-    """),
-    ("TAUX DE RUPTURE PAR HEURE DE LA JOURNEE", """
-        select extract(hour from heure) as heure_du_jour,
-               count(*) as observations,
-               round(avg(taux_rupture_pct), 2) as taux_moyen_pct
-        from analytics.fct_station_heure
-        group by 1
-        order by 1
-    """),
-]
+DEBUT = "2026-09-08 12:00+00"
+conn = psycopg2.connect(os.environ["DATABASE_URL"], cursor_factory=RealDictCursor)
 
-with psycopg2.connect(os.environ["DATABASE_URL"]) as conn:
+def q(titre, sql, params=None):
+    print("\n" + "=" * 70)
+    print(titre)
+    print("=" * 70)
     with conn.cursor() as cur:
-        for titre, sql in REQUETES:
-            cur.execute(sql)
-            colonnes = [c[0] for c in cur.description]
-            print("\n=== " + titre + " ===")
-            print(" | ".join(colonnes))
-            for ligne in cur.fetchall():
-                print(" | ".join(str(v) for v in ligne))
+        cur.execute(sql, params or ())
+        for r in cur.fetchall():
+            print(dict(r))
+
+q("Couverture reelle de la collecte", """
+  select count(distinct snapshot_ts) as releves,
+         min(snapshot_ts) as debut,
+         max(snapshot_ts) as fin,
+         round(extract(epoch from (max(snapshot_ts) - min(snapshot_ts))) / 300.0) as attendus
+  from analytics.stg_station_status
+  where snapshot_ts >= %s
+""", (DEBUT,))
+
+q("Surechantillonnage : releves contre etats publies par la source", """
+  select count(*) as releves,
+         count(distinct (station_id, last_reported)) as etats_publies,
+         round(count(*)::numeric
+               / nullif(count(distinct (station_id, last_reported)), 0), 2) as facteur
+  from analytics.stg_station_status
+  where snapshot_ts >= %s and est_exploitee
+""", (DEBUT,))
+
+q("Stations les plus souvent en rupture", """
+  select d.nom_station,
+         count(*) as heures,
+         round(avg(f.taux_rupture_pct), 1) as rupture_pct,
+         round(avg(f.taux_vide_pct), 1)    as vide_pct,
+         round(avg(f.taux_pleine_pct), 1)  as pleine_pct
+  from analytics.fct_station_heure f
+  join analytics.dim_station d using (station_id)
+  where f.heure >= %s
+  group by d.nom_station
+  having count(*) >= 10
+  order by 3 desc
+  limit 15
+""", (DEBUT,))
+
+q("Durees d episodes", """
+  select type_rupture,
+         count(*) as episodes,
+         round(avg(duree_minutes), 1) as moyenne,
+         round(percentile_cont(0.5) within group (order by duree_minutes)::numeric, 1) as mediane,
+         max(duree_minutes) as maxi
+  from analytics.fct_episode_rupture
+  where debut >= %s
+  group by type_rupture order by 1
+""", (DEBUT,))
+
+q("Profil horaire : stations vides contre stations pleines", """
+  select extract(hour from f.heure) as h,
+         count(distinct f.heure) as heures_observees,
+         round(avg(f.taux_vide_pct), 2)   as vide_pct,
+         round(avg(f.taux_pleine_pct), 2) as pleine_pct
+  from analytics.fct_station_heure f
+  where f.heure >= %s
+  group by 1 order by 1
+""", (DEBUT,))
+
+conn.close()
