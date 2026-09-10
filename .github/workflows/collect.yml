@@ -1,6 +1,3 @@
-cd C:\Users\Probook\OneDrive\Documents\velib-monitoring
-$enc = New-Object System.Text.UTF8Encoding($false)
-$wf = @'
 name: collecte-velib
 
 on:
@@ -31,9 +28,3 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DUREE_MINUTES: "230"
           INTERVALLE_SECONDES: "300"
-'@
-[IO.File]::WriteAllText("$PWD\.github\workflows\collect.yml", $wf, $enc)
-
-git add .
-git commit -m "Boucle allongee a 230 min : la couverture suit les declenchements reels"
-git push
